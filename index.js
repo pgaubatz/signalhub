@@ -7,10 +7,21 @@ var inherits = require('inherits')
 
 module.exports = SignalHub
 
-function SignalHub (app, urls) {
+function SignalHub (app, urls, headers) {
   if (!(this instanceof SignalHub)) return new SignalHub(app, urls)
   if (!app) throw new Error('app name required')
   if (!urls || !urls.length) throw new Error('signalhub url(s) required')
+  if (typeof headers === 'undefined') {
+    this.headers = noop
+  } else if (typeof headers === 'function') {
+    this.headers = headers
+  } else if (typeof headers === 'object' && headers != null) {
+    this.headers = function () {
+      return headers
+    }
+  } else {
+    throw new Error('headers must either be a plain object or a function')
+  }
 
   events.EventEmitter.call(this)
   this.setMaxListeners(0)
@@ -70,7 +81,7 @@ SignalHub.prototype.broadcast = function (channel, message, cb) {
 
   var self = this
   this.urls.forEach(function (url) {
-    broadcast(self.app, url, channel, message, function (err) {
+    broadcast(self.app, url, channel, message, self.headers(), function (err) {
       if (err) errors++
       if (--pending) return
       if (errors === self.urls.length) return cb(err)
@@ -103,10 +114,11 @@ SignalHub.prototype.close = function (cb) {
   }
 }
 
-function broadcast (app, url, channel, message, cb) {
+function broadcast (app, url, channel, message, headers, cb) {
   return nets({
     method: 'POST',
     json: message,
+    headers: headers,
     url: url + '/v1/' + app + '/' + channel
   }, function (err, res) {
     if (err) return cb(err)

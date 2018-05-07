@@ -32,7 +32,7 @@ hub.broadcast('my-channel', {hello: 'world'})
 
 ## API
 
-#### `hub = signalhub(appName, urls)`
+#### `hub = signalhub(appName, urls, [headers])`
 
 Create a new hub client. If you have more than one hub running specify them in an array
 
@@ -47,6 +47,8 @@ var hub = signalhub('my-app-name', [
 
 The `appName` is used to namespace the subscriptions/broadcast so you can reuse the
 signalhub for more than one app.
+
+The optional `headers` argument can either be a plain object or a function that returns a plain object containing additional HTTP request headers to be sent. For instance, this can be used to send an HTTP `Authorization` request header for implementing access control mechanisms.
 
 #### `stream = hub.subscribe(channel)`
 

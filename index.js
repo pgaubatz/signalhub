@@ -4,13 +4,15 @@ var nets = require('nets')
 var pump = require('pump')
 var through = require('through2')
 var inherits = require('inherits')
+var qs = require('querystringify')
 
 module.exports = SignalHub
 
-function SignalHub (app, urls) {
-  if (!(this instanceof SignalHub)) return new SignalHub(app, urls)
+function SignalHub (app, urls, query) {
+  if (!(this instanceof SignalHub)) return new SignalHub(app, urls, query)
   if (!app) throw new Error('app name required')
   if (!urls || !urls.length) throw new Error('signalhub url(s) required')
+  if (query != null && typeof query !== 'object') throw new Error('query is expected to be a plain object')
 
   events.EventEmitter.call(this)
   this.setMaxListeners(0)
@@ -23,6 +25,7 @@ function SignalHub (app, urls) {
   })
   this.subscribers = []
   this.closed = false
+  this.query = qs.stringify(query, true)
 }
 
 inherits(SignalHub, events.EventEmitter)
@@ -33,7 +36,7 @@ SignalHub.prototype.subscribe = function (channel) {
   var self = this
   var endpoint = Array.isArray(channel) ? channel.join(',') : channel
   var streams = this.urls.map(function (url) {
-    return ess(url + '/v1/' + self.app + '/' + endpoint, {json: true})
+    return ess(url + '/v1/' + self.app + '/' + endpoint + self.query, {json: true})
   })
 
   var subscriber
@@ -70,7 +73,7 @@ SignalHub.prototype.broadcast = function (channel, message, cb) {
 
   var self = this
   this.urls.forEach(function (url) {
-    broadcast(self.app, url, channel, message, function (err) {
+    broadcast(self.app, url, channel, message, self.query, function (err) {
       if (err) errors++
       if (--pending) return
       if (errors === self.urls.length) return cb(err)
@@ -103,11 +106,11 @@ SignalHub.prototype.close = function (cb) {
   }
 }
 
-function broadcast (app, url, channel, message, cb) {
+function broadcast (app, url, channel, message, query, cb) {
   return nets({
     method: 'POST',
     json: message,
-    url: url + '/v1/' + app + '/' + channel
+    url: url + '/v1/' + app + '/' + channel + query
   }, function (err, res) {
     if (err) return cb(err)
     if (res.statusCode !== 200) return cb(new Error('Bad status: ' + res.statusCode))
